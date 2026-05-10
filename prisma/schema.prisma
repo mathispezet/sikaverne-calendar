@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // ↑ plus de "url" ici, c'est dans prisma.config.ts maintenant
+}
+
+// === Modèles ===
+
+model User {
+  id            String   @id @default(cuid())
+  authentikId   String   @unique
+  email         String   @unique
+  username      String   @unique
+  displayName   String
+  color         String   @default("#3b82f6")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  slots         Slot[]
+  recurringRules RecurringRule[]
+}
+
+enum SlotStatus {
+  AVAILABLE
+  WORKING
+  UNAVAILABLE
+  CUSTOM
+}
+
+enum TimeSlot {
+  MORNING
+  AFTERNOON
+  EVENING
+}
+
+model Slot {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date         DateTime   @db.Date
+  timeSlot     TimeSlot
+  status       SlotStatus
+  customLabel  String?
+  customColor  String?
+  note         String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([userId, date, timeSlot])
+  @@index([date])
+}
+
+model RecurringRule {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayOfWeek    Int
+  timeSlot     TimeSlot
+  status       SlotStatus
+  customLabel  String?
+  customColor  String?
+  startDate    DateTime   @db.Date
+  endDate      DateTime?  @db.Date
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([userId, dayOfWeek, timeSlot])
+}

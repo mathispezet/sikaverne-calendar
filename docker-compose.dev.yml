@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sikaverne-calendar-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: sikaverne
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: sikaverne_calendar
+    volumes:
+      - ./.docker/postgres-data:/var/lib/postgresql/data
