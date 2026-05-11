@@ -1,4 +1,4 @@
-import { User, Slot } from "@/lib/types"
+import { User, Slot, TimeSlot } from "@/lib/types"
 import { getWeekDays, formatDayHeader, isToday } from "@/lib/dates"
 import { format } from "date-fns"
 import { DayCell } from "./day-cell"
@@ -8,9 +8,17 @@ interface CalendarGridProps {
   weekStart: Date
   users: User[]
   slots: Slot[]
+  currentUserId: string
+  onSlotClick: (userId: string, date: string, timeSlot: TimeSlot) => void
 }
 
-export function CalendarGrid({ weekStart, users, slots }: CalendarGridProps) {
+export function CalendarGrid({
+  weekStart,
+  users,
+  slots,
+  currentUserId,
+  onSlotClick,
+}: CalendarGridProps) {
   const days = getWeekDays(weekStart)
 
   return (
@@ -35,33 +43,50 @@ export function CalendarGrid({ weekStart, users, slots }: CalendarGridProps) {
           </tr>
         </thead>
         <tbody>
-          {users.map((user) => (
-            <tr key={user.id} className="border-t border-slate-700">
-              <td className="sticky left-0 bg-slate-950 z-10 p-3 border-r border-slate-700">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: user.color }}
-                  />
-                  <span className="font-medium text-sm">{user.displayName}</span>
-                </div>
-              </td>
-              {days.map((day) => {
-                const dateStr = format(day, "yyyy-MM-dd")
-                return (
-                  <td
-                    key={day.toISOString()}
-                    className={cn(
-                      "border-r border-slate-700 last:border-r-0 align-top",
-                      isToday(day) && "bg-blue-950/20"
-                    )}
-                  >
-                    <DayCell userId={user.id} date={dateStr} slots={slots} />
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
+          {users.map((user) => {
+            const isCurrentUser = user.id === currentUserId
+            return (
+              <tr key={user.id} className="border-t border-slate-700">
+                <td
+                  className={cn(
+                    "sticky left-0 bg-slate-950 z-10 p-3 border-r border-slate-700",
+                    isCurrentUser && "bg-slate-900"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: user.color }}
+                    />
+                    <span className="font-medium text-sm">
+                      {user.displayName}
+                      {isCurrentUser && <span className="text-blue-400"> (toi)</span>}
+                    </span>
+                  </div>
+                </td>
+                {days.map((day) => {
+                  const dateStr = format(day, "yyyy-MM-dd")
+                  return (
+                    <td
+                      key={day.toISOString()}
+                      className={cn(
+                        "border-r border-slate-700 last:border-r-0 align-top",
+                        isToday(day) && "bg-blue-950/20"
+                      )}
+                    >
+                      <DayCell
+                        userId={user.id}
+                        date={dateStr}
+                        slots={slots}
+                        isEditable={isCurrentUser}
+                        onSlotClick={onSlotClick}
+                      />
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

@@ -3,19 +3,19 @@ import { TimeSlotBlock } from "./time-slot-block"
 
 interface DayCellProps {
   userId: string
-  date: string  // YYYY-MM-DD
+  date: string
   slots: Slot[]
+  isEditable: boolean
+  onSlotClick: (userId: string, date: string, timeSlot: TimeSlot) => void
 }
 
 const TIME_SLOTS_ORDER: TimeSlot[] = ["MORNING", "AFTERNOON", "EVENING"]
 
-export function DayCell({ userId, date, slots }: DayCellProps) {
-  // Récupère les slots de ce user pour ce jour
+export function DayCell({ userId, date, slots, isEditable, onSlotClick }: DayCellProps) {
   const userDaySlots = slots.filter(
     (s) => s.userId === userId && s.date === date
   )
 
-  // Pour chaque créneau, trouve s'il y a un slot
   const slotByTime = (timeSlot: TimeSlot) =>
     userDaySlots.find((s) => s.timeSlot === timeSlot)
 
@@ -25,10 +25,8 @@ export function DayCell({ userId, date, slots }: DayCellProps) {
         <TimeSlotBlock
           key={timeSlot}
           slot={slotByTime(timeSlot)}
-          onClick={() => {
-            // Sprint B5 : ouvrira un popup d'édition
-            console.log("Clicked", { userId, date, timeSlot })
-          }}
+          isEditable={isEditable}
+          onClick={isEditable ? () => onSlotClick(userId, date, timeSlot) : undefined}
         />
       ))}
     </div>

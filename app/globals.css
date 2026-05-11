@@ -6,10 +6,12 @@
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: hsl(222 47% 8%);    /* fond très sombre */
+  --color-foreground: hsl(210 40% 98%);   /* texte clair */
+  --color-card: hsl(222 47% 11%);
+  --color-popover: hsl(222 47% 11%);
+  --color-border: hsl(217 33% 17%);
+  /* etc. */
 }
 
 @media (prefers-color-scheme: dark) {

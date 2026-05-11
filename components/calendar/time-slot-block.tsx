@@ -4,27 +4,31 @@ import { Slot, STATUS_CONFIG } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface TimeSlotBlockProps {
-  slot?: Slot                  // si undefined : pas de slot défini
+  slot?: Slot
+  isEditable: boolean
   onClick?: () => void
 }
 
-export function TimeSlotBlock({ slot, onClick }: TimeSlotBlockProps) {
+export function TimeSlotBlock({ slot, isEditable, onClick }: TimeSlotBlockProps) {
   if (!slot) {
     return (
       <button
         onClick={onClick}
-        className="w-full h-7 bg-slate-800 hover:bg-slate-700 rounded text-xs text-slate-500 transition-colors"
-        aria-label="Aucun statut, cliquer pour définir"
+        disabled={!isEditable}
+        className={cn(
+          "w-full h-7 bg-slate-800 rounded text-xs text-slate-500 transition-colors",
+          isEditable && "hover:bg-slate-700 cursor-pointer",
+          !isEditable && "cursor-default"
+        )}
+        aria-label="Aucun statut"
       >
-        ?
+        {isEditable ? "+" : "?"}
       </button>
     )
   }
 
   const config = STATUS_CONFIG[slot.status]
   const isCustom = slot.status === "CUSTOM"
-  
-  // Pour status CUSTOM, on utilise la couleur custom de l'utilisateur
   const customStyle = isCustom && slot.customColor
     ? { backgroundColor: slot.customColor }
     : undefined
@@ -34,10 +38,13 @@ export function TimeSlotBlock({ slot, onClick }: TimeSlotBlockProps) {
   return (
     <button
       onClick={onClick}
+      disabled={!isEditable}
       className={cn(
-        "w-full h-7 rounded text-xs font-medium transition-opacity hover:opacity-80",
+        "w-full h-7 rounded text-xs font-medium transition-opacity",
         !isCustom && config.bgClass,
         config.textClass,
+        isEditable && "hover:opacity-80 cursor-pointer",
+        !isEditable && "cursor-default opacity-90"
       )}
       style={customStyle}
       title={slot.note ?? label}
