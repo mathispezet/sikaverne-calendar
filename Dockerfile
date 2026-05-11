@@ -8,7 +8,11 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm install -g pnpm@9 && pnpm prisma generate && pnpm build
+# DATABASE_URL factice pour que prisma.config.ts puisse être chargé au build
+# (prisma generate ne se connecte pas à la DB, il génère juste le client)
+RUN npm install -g pnpm@9 && \
+    DATABASE_URL="postgresql://build:build@localhost:5432/build" pnpm prisma generate && \
+    pnpm build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
