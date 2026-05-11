@@ -30,9 +30,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         await db.user.upsert({
           where: { email: user.email },
           update: {
+            // Met à jour seulement si pas encore défini (préserve un éventuel seed)
+            authentikId: profile.sub as string,
             displayName: (profile.name as string) ?? user.name ?? user.email,
             username: (profile.preferred_username as string) ?? user.email,
-            authentikId: profile.sub as string,
           },
           create: {
             email: user.email,

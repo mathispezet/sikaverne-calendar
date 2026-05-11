@@ -11,20 +11,20 @@ datasource db {
 
 model User {
   id            String   @id @default(cuid())
-  authentikId   String   @unique
+  authentikId   String?  @unique
   email         String   @unique
   username      String   @unique
   displayName   String
   color         String   @default("#3b82f6")
   emailVerified DateTime?
-  image         String?      
+  image         String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   slots          Slot[]
   recurringRules RecurringRule[]
-  accounts       Account[]  
-  sessions       Session[]    
+  accounts       Account[]
+  sessions       Session[]
 }
 
 enum SlotStatus {
