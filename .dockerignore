@@ -5,4 +5,5 @@ node_modules
 .env.local
 .env.production
 docker-compose.dev.yml
+pnpm-workspace.yaml
 *.log
