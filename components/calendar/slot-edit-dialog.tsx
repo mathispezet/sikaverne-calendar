@@ -138,7 +138,7 @@ export function SlotEditDialog({
                     >
                       <span
                         className={cn(
-                          "inline-block w-4 h-4 rounded",
+                          "inline-block w-4 h-4 rounded ring-1 ring-white/30",
                           key !== "CUSTOM" && config.bgClass,
                         )}
                         style={key === "CUSTOM" ? { backgroundColor: customColor } : undefined}

@@ -34,6 +34,10 @@ export function CalendarGrid({
             <th className="sticky left-0 bg-card z-10 p-2 sm:p-3 text-left text-xs sm:text-sm font-medium border-r border-border min-w-[110px] sm:min-w-[140px]">
               Utilisateur
             </th>
+            {/* Colonne légende créneaux */}
+            <th className="p-2 sm:p-3 text-center text-xs sm:text-sm font-medium border-r border-border min-w-[60px] sm:min-w-[70px]">
+              Créneau
+            </th>
             {days.map((day) => (
               <th
                 key={day.toISOString()}
@@ -48,30 +52,6 @@ export function CalendarGrid({
           </tr>
         </thead>
         <tbody>
-          {/* Ligne légende matin/aprem/soir */}
-          <tr className="border-t border-border">
-            <td className="sticky left-0 bg-background z-10 p-2 sm:p-3 border-r border-border">
-              <div className="flex flex-col gap-0.5 sm:gap-1 py-0.5">
-                {(["MORNING", "AFTERNOON", "EVENING"] as TimeSlot[]).map((ts) => (
-                  <div
-                    key={ts}
-                    className="h-6 sm:h-7 flex items-center text-[10px] sm:text-xs text-muted-foreground font-medium"
-                  >
-                    {TIME_SLOT_CONFIG[ts].label}
-                  </div>
-                ))}
-              </div>
-            </td>
-            {days.map((day) => (
-              <td
-                key={day.toISOString()}
-                className={cn(
-                  "border-r border-border last:border-r-0",
-                  isToday(day) && "bg-blue-950/20"
-                )}
-              />
-            ))}
-          </tr>
           {users.map((user) => {
             const isCurrentUser = user.id === currentUserId
             return (
@@ -91,6 +71,19 @@ export function CalendarGrid({
                       {user.displayName}
                       {isCurrentUser && <span className="text-primary"> (toi)</span>}
                     </span>
+                  </div>
+                </td>
+                {/* Colonne légende créneaux */}
+                <td className={cn("border-r border-border align-top", isToday(days[0]) && "")}>
+                  <div className="flex flex-col gap-0.5 sm:gap-1 p-0.5 sm:p-1">
+                    {(["MORNING", "AFTERNOON", "EVENING"] as TimeSlot[]).map((ts) => (
+                      <div
+                        key={ts}
+                        className="h-6 sm:h-7 flex items-center justify-center text-[10px] sm:text-xs text-muted-foreground font-medium"
+                      >
+                        {TIME_SLOT_CONFIG[ts].short}
+                      </div>
+                    ))}
                   </div>
                 </td>
                 {days.map((day) => {
