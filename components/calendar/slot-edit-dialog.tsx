@@ -108,7 +108,7 @@ export function SlotEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-slate-900 border-slate-700">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="capitalize">{dateLabel}</DialogTitle>
           <DialogDescription>

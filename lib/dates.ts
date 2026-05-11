@@ -38,6 +38,13 @@ export function formatDayHeader(date: Date): string {
 }
 
 /**
+ * Format français long : "Lundi 12 mai"
+ */
+export function formatDayLong(date: Date): string {
+  return format(date, "EEEE d MMMM", { locale: fr })
+}
+
+/**
  * Format complet : "Semaine du 13 mai au 19 mai 2026"
  */
 export function formatWeekRange(weekStart: Date): string {

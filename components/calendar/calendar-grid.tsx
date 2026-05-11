@@ -25,18 +25,20 @@ export function CalendarGrid({
   const days = getWeekDays(weekStart)
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-700">
+    <div className="relative overflow-x-auto rounded-lg border border-border">
+      {/* Gradient indicateur scroll horizontal sur mobile */}
+      <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent z-20 sm:hidden" />
       <table className="w-full">
         <thead>
-          <tr className="bg-slate-900">
-            <th className="sticky left-0 bg-slate-900 z-10 p-3 text-left text-sm font-medium border-r border-slate-700 min-w-[140px]">
+          <tr className="bg-card">
+            <th className="sticky left-0 bg-card z-10 p-2 sm:p-3 text-left text-xs sm:text-sm font-medium border-r border-border min-w-[110px] sm:min-w-[140px]">
               Utilisateur
             </th>
             {days.map((day) => (
               <th
                 key={day.toISOString()}
                 className={cn(
-                  "p-3 text-center text-sm font-medium border-r border-slate-700 last:border-r-0",
+                  "p-2 sm:p-3 text-center text-xs sm:text-sm font-medium border-r border-border last:border-r-0 min-w-[60px] sm:min-w-[80px]",
                   isToday(day) && "bg-blue-900/30"
                 )}
               >
@@ -49,21 +51,21 @@ export function CalendarGrid({
           {users.map((user) => {
             const isCurrentUser = user.id === currentUserId
             return (
-              <tr key={user.id} className="border-t border-slate-700">
+              <tr key={user.id} className="border-t border-border">
                 <td
                   className={cn(
-                    "sticky left-0 bg-slate-950 z-10 p-3 border-r border-slate-700",
-                    isCurrentUser && "bg-slate-900"
+                    "sticky left-0 bg-background z-10 p-2 sm:p-3 border-r border-border",
+                    isCurrentUser && "bg-card"
                   )}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full flex-shrink-0"
                       style={{ backgroundColor: user.color }}
                     />
-                    <span className="font-medium text-sm">
+                    <span className="font-medium text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">
                       {user.displayName}
-                      {isCurrentUser && <span className="text-blue-400"> (toi)</span>}
+                      {isCurrentUser && <span className="text-primary"> (toi)</span>}
                     </span>
                   </div>
                 </td>
@@ -73,7 +75,7 @@ export function CalendarGrid({
                     <td
                       key={day.toISOString()}
                       className={cn(
-                        "border-r border-slate-700 last:border-r-0 align-top",
+                        "border-r border-border last:border-r-0 align-top",
                         isToday(day) && "bg-blue-950/20"
                       )}
                     >

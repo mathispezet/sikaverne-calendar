@@ -17,7 +17,7 @@ const TIME_SLOTS_ORDER: TimeSlot[] = ["MORNING", "AFTERNOON", "EVENING"]
 
 export function DayCell({ userId, date, slots, rules, isEditable, onSlotClick }: DayCellProps) {
   return (
-    <div className="flex flex-col gap-1 p-1 min-w-[80px]">
+    <div className="flex flex-col gap-0.5 sm:gap-1 p-0.5 sm:p-1 min-w-[60px] sm:min-w-[80px]">
       {TIME_SLOTS_ORDER.map((timeSlot) => {
         const resolved = resolveSlot(userId, date, timeSlot, slots, rules)
         return (

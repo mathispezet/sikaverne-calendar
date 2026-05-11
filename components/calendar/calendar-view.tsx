@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useTransition, useEffect, useCallback } from "react"
+import { toast } from "sonner"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Skeleton } from "@/components/ui/skeleton"
 import { CalendarGrid } from "./calendar-grid"
 import { WeekNavigator } from "./week-navigator"
 import { MonthGrid } from "./month-grid"
@@ -35,6 +37,26 @@ function getInitialView(): View {
   return (localStorage.getItem("calendar-view") as View) ?? "week"
 }
 
+function CalendarSkeleton() {
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2 mb-4">
+        <Skeleton className="h-10 w-10 rounded" />
+        <Skeleton className="h-10 flex-1 rounded" />
+        <Skeleton className="h-10 w-10 rounded" />
+      </div>
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="flex gap-2">
+          <Skeleton className="h-24 w-32 rounded" />
+          {[...Array(7)].map((_, j) => (
+            <Skeleton key={j} className="h-24 flex-1 rounded" />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function CalendarView({
   currentUserId,
   initialWeekStart,
@@ -48,6 +70,7 @@ export function CalendarView({
   const [slots, setSlots] = useState<Slot[]>(initialSlots)
   const [rules, setRules] = useState<RecurringRule[]>(initialRules)
   const [isPending, startTransition] = useTransition()
+  const [animKey, setAnimKey] = useState(0)
   const [dialog, setDialog] = useState<DialogState | null>(null)
 
   const handleViewChange = (v: View) => {
@@ -56,30 +79,44 @@ export function CalendarView({
   }
 
   const refresh = useCallback(async () => {
-    if (view === "week") {
-      const { slots: s, rules: r } = await getCalendarDataForWeek(weekStart)
-      setSlots(s)
-      setRules(r)
-    } else {
-      const s = await getSlotsForMonth(monthStart)
-      setSlots(s)
+    try {
+      if (view === "week") {
+        const { slots: s, rules: r } = await getCalendarDataForWeek(weekStart)
+        setSlots(s)
+        setRules(r)
+      } else {
+        const s = await getSlotsForMonth(monthStart)
+        setSlots(s)
+      }
+    } catch {
+      toast.error("Erreur lors du rechargement du calendrier")
     }
   }, [view, weekStart, monthStart])
 
   const handleWeekChange = (newWeekStart: Date) => {
     setWeekStart(newWeekStart)
+    setAnimKey((k) => k + 1)
     startTransition(async () => {
-      const { slots: s, rules: r } = await getCalendarDataForWeek(newWeekStart)
-      setSlots(s)
-      setRules(r)
+      try {
+        const { slots: s, rules: r } = await getCalendarDataForWeek(newWeekStart)
+        setSlots(s)
+        setRules(r)
+      } catch {
+        toast.error("Impossible de charger la semaine")
+      }
     })
   }
 
   const handleMonthChange = (newMonthStart: Date) => {
     setMonthStart(newMonthStart)
+    setAnimKey((k) => k + 1)
     startTransition(async () => {
-      const s = await getSlotsForMonth(newMonthStart)
-      setSlots(s)
+      try {
+        const s = await getSlotsForMonth(newMonthStart)
+        setSlots(s)
+      } catch {
+        toast.error("Impossible de charger le mois")
+      }
     })
   }
 
@@ -90,7 +127,6 @@ export function CalendarView({
       (s) => s.userId === userId && s.date === date && s.timeSlot === timeSlot
     )
 
-    // Cherche si ce slot hérite d'une règle récurrente (pas de slot spécifique)
     let inheritedRule: RecurringRule | undefined
     if (!existingSlot) {
       const dateObj = new Date(date + "T00:00:00")
@@ -110,7 +146,6 @@ export function CalendarView({
     setDialog({ open: true, userId, date, timeSlot, existingSlot, inheritedRule })
   }
 
-  // Raccourcis clavier
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName
@@ -150,28 +185,32 @@ export function CalendarView({
         </Tabs>
       </div>
 
-      <div className={isPending ? "opacity-50 transition-opacity" : ""}>
-        {view === "week" ? (
-          <>
-            <WeekNavigator weekStart={weekStart} onChange={handleWeekChange} />
-            <CalendarGrid
-              weekStart={weekStart}
+      {isPending ? (
+        <CalendarSkeleton />
+      ) : (
+        <div key={animKey} className="animate-fade-in">
+          {view === "week" ? (
+            <>
+              <WeekNavigator weekStart={weekStart} onChange={handleWeekChange} />
+              <CalendarGrid
+                weekStart={weekStart}
+                users={initialUsers}
+                slots={slots}
+                rules={rules}
+                currentUserId={currentUserId}
+                onSlotClick={handleSlotClick}
+              />
+            </>
+          ) : (
+            <MonthGrid
+              monthStart={monthStart}
               users={initialUsers}
               slots={slots}
-              rules={rules}
-              currentUserId={currentUserId}
-              onSlotClick={handleSlotClick}
+              onMonthChange={handleMonthChange}
             />
-          </>
-        ) : (
-          <MonthGrid
-            monthStart={monthStart}
-            users={initialUsers}
-            slots={slots}
-            onMonthChange={handleMonthChange}
-          />
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {dialog && (
         <SlotEditDialog
