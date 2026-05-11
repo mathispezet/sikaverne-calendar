@@ -30,7 +30,7 @@ services:
   calendar-migrate:
     build: .
     restart: "no"
-    command: npx prisma migrate deploy
+    command: node node_modules/prisma/build/index.js migrate deploy
     env_file: .env.production
     depends_on:
       calendar-db:
