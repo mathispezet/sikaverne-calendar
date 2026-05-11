@@ -20,12 +20,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id
-        // displayName n'est pas mappé automatiquement par Auth.js — on le fetch
         const dbUser = await db.user.findUnique({
           where: { id: user.id },
           select: { displayName: true },
         })
-        session.user.name = dbUser?.displayName ?? user.name ?? user.email
+        const displayName = dbUser?.displayName?.trim()
+        session.user.name = displayName || user.name || user.email
       }
       return session
     },
