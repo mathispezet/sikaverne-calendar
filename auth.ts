@@ -13,14 +13,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       clientId: process.env.AUTH_AUTHENTIK_ID,
       clientSecret: process.env.AUTH_AUTHENTIK_SECRET,
       issuer: process.env.AUTH_AUTHENTIK_ISSUER,
-      allowDangerousEmailAccountLinking: true,  // ← AJOUT
+      allowDangerousEmailAccountLinking: true,
     }),
   ],
   callbacks: {
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id
-        // Expose nos champs custom dans la session
         session.user.name = (user as any).displayName ?? user.name
       }
       return session
@@ -30,7 +29,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         await db.user.upsert({
           where: { email: user.email },
           update: {
-            // Met à jour seulement si pas encore défini (préserve un éventuel seed)
             authentikId: profile.sub as string,
             displayName: (profile.name as string) ?? user.name ?? user.email,
             username: (profile.preferred_username as string) ?? user.email,

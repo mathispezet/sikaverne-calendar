@@ -31,11 +31,11 @@ export function CalendarGrid({
       <table className="w-full">
         <thead>
           <tr className="bg-card">
-            <th className="sticky left-0 bg-card z-10 p-2 sm:p-3 text-left text-xs sm:text-sm font-medium border-r border-border min-w-[110px] sm:min-w-[140px]">
+            <th className="sticky left-0 bg-card z-10 p-2 sm:p-3 text-left text-xs sm:text-sm font-medium border-r border-border min-w-[90px] sm:min-w-[120px]">
               Utilisateur
             </th>
             {/* Colonne légende créneaux */}
-            <th className="p-2 sm:p-3 text-center text-xs sm:text-sm font-medium border-r border-border min-w-[60px] sm:min-w-[70px]">
+            <th className="p-2 sm:p-3 text-center text-xs sm:text-sm font-medium border-r border-border min-w-[60px] sm:min-w-[80px]">
               Créneau
             </th>
             {days.map((day) => (
@@ -74,14 +74,14 @@ export function CalendarGrid({
                   </div>
                 </td>
                 {/* Colonne légende créneaux */}
-                <td className={cn("border-r border-border align-top", isToday(days[0]) && "")}>
+                <td className="border-r border-border align-top">
                   <div className="flex flex-col gap-0.5 sm:gap-1 p-0.5 sm:p-1">
                     {(["MORNING", "AFTERNOON", "EVENING"] as TimeSlot[]).map((ts) => (
                       <div
                         key={ts}
                         className="h-6 sm:h-7 flex items-center justify-center text-[10px] sm:text-xs text-muted-foreground font-medium"
                       >
-                        {TIME_SLOT_CONFIG[ts].short}
+                        {TIME_SLOT_CONFIG[ts].label}
                       </div>
                     ))}
                   </div>
