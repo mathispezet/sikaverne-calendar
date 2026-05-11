@@ -31,17 +31,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async signIn({ user, account, profile }) {
       if (profile && user.email) {
+        const displayName =
+          (profile.name as string)?.trim() ||
+          (profile.preferred_username as string)?.trim() ||
+          user.name?.trim() ||
+          user.email
+        const username =
+          (profile.preferred_username as string)?.trim() || user.email
+
         await db.user.upsert({
           where: { email: user.email },
           update: {
             authentikId: profile.sub as string,
-            displayName: (profile.name as string) ?? user.name ?? user.email,
-            username: (profile.preferred_username as string) ?? user.email,
+            displayName,
+            username,
           },
           create: {
             email: user.email,
-            displayName: (profile.name as string) ?? user.name ?? user.email,
-            username: (profile.preferred_username as string) ?? user.email,
+            displayName,
+            username,
             authentikId: profile.sub as string,
           },
         })
