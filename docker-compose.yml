@@ -28,9 +28,10 @@ services:
       retries: 10
 
   calendar-migrate:
-    build: .
+    build:
+      context: .
+      target: migrator
     restart: "no"
-    command: node node_modules/prisma/build/index.js migrate deploy
     env_file: .env.production
     depends_on:
       calendar-db:
