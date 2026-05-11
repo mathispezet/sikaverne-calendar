@@ -1,11 +1,16 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, useEffect, useCallback } from "react"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CalendarGrid } from "./calendar-grid"
 import { WeekNavigator } from "./week-navigator"
+import { MonthGrid } from "./month-grid"
 import { SlotEditDialog } from "./slot-edit-dialog"
-import { getSlotsForWeek } from "@/lib/actions/calendar"
+import { getSlotsForWeek, getSlotsForMonth } from "@/lib/actions/calendar"
+import { getWeekStart, getMonthStart, nextWeek, prevWeek } from "@/lib/dates"
 import type { User, Slot, TimeSlot } from "@/lib/types"
+
+type View = "week" | "month"
 
 interface CalendarViewProps {
   currentUserId: string
@@ -22,21 +27,38 @@ interface DialogState {
   existingSlot?: Slot
 }
 
+function getInitialView(): View {
+  if (typeof window === "undefined") return "week"
+  return (localStorage.getItem("calendar-view") as View) ?? "week"
+}
+
 export function CalendarView({
   currentUserId,
   initialWeekStart,
   initialUsers,
   initialSlots,
 }: CalendarViewProps) {
+  const [view, setView] = useState<View>(getInitialView)
   const [weekStart, setWeekStart] = useState(() => new Date(initialWeekStart))
+  const [monthStart, setMonthStart] = useState(() => getMonthStart(new Date(initialWeekStart)))
   const [slots, setSlots] = useState<Slot[]>(initialSlots)
   const [isPending, startTransition] = useTransition()
   const [dialog, setDialog] = useState<DialogState | null>(null)
 
-  const refresh = async () => {
-    const fresh = await getSlotsForWeek(weekStart)
-    setSlots(fresh)
+  const handleViewChange = (v: View) => {
+    setView(v)
+    localStorage.setItem("calendar-view", v)
   }
+
+  const refresh = useCallback(async () => {
+    if (view === "week") {
+      const fresh = await getSlotsForWeek(weekStart)
+      setSlots(fresh)
+    } else {
+      const fresh = await getSlotsForMonth(monthStart)
+      setSlots(fresh)
+    }
+  }, [view, weekStart, monthStart])
 
   const handleWeekChange = (newWeekStart: Date) => {
     setWeekStart(newWeekStart)
@@ -46,35 +68,84 @@ export function CalendarView({
     })
   }
 
-  const handleSlotClick = (userId: string, date: string, timeSlot: TimeSlot) => {
-    // Seul le user courant peut éditer ses propres slots
-    if (userId !== currentUserId) return
-
-    const existingSlot = slots.find(
-      (s) => s.userId === userId && s.date === date && s.timeSlot === timeSlot
-    )
-
-    setDialog({
-      open: true,
-      userId,
-      date,
-      timeSlot,
-      existingSlot,
+  const handleMonthChange = (newMonthStart: Date) => {
+    setMonthStart(newMonthStart)
+    startTransition(async () => {
+      const fresh = await getSlotsForMonth(newMonthStart)
+      setSlots(fresh)
     })
   }
 
+  const handleSlotClick = (userId: string, date: string, timeSlot: TimeSlot) => {
+    if (userId !== currentUserId) return
+    const existingSlot = slots.find(
+      (s) => s.userId === userId && s.date === date && s.timeSlot === timeSlot
+    )
+    setDialog({ open: true, userId, date, timeSlot, existingSlot })
+  }
+
+  // Raccourcis clavier
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return
+
+      switch (e.key) {
+        case "ArrowLeft":
+          if (view === "week") handleWeekChange(prevWeek(weekStart))
+          break
+        case "ArrowRight":
+          if (view === "week") handleWeekChange(nextWeek(weekStart))
+          break
+        case "t":
+          handleWeekChange(getWeekStart())
+          if (view === "month") setMonthStart(getMonthStart())
+          break
+        case "w":
+          handleViewChange("week")
+          break
+        case "m":
+          handleViewChange("month")
+          break
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [view, weekStart])
+
   return (
     <>
-      <WeekNavigator weekStart={weekStart} onChange={handleWeekChange} />
-      <div className={isPending ? "opacity-50 transition-opacity" : ""}>
-        <CalendarGrid
-          weekStart={weekStart}
-          users={initialUsers}
-          slots={slots}
-          currentUserId={currentUserId}
-          onSlotClick={handleSlotClick}
-        />
+      <div className="flex justify-end mb-4">
+        <Tabs value={view} onValueChange={(v) => handleViewChange(v as View)}>
+          <TabsList>
+            <TabsTrigger value="week">Semaine</TabsTrigger>
+            <TabsTrigger value="month">Mois</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
+
+      <div className={isPending ? "opacity-50 transition-opacity" : ""}>
+        {view === "week" ? (
+          <>
+            <WeekNavigator weekStart={weekStart} onChange={handleWeekChange} />
+            <CalendarGrid
+              weekStart={weekStart}
+              users={initialUsers}
+              slots={slots}
+              currentUserId={currentUserId}
+              onSlotClick={handleSlotClick}
+            />
+          </>
+        ) : (
+          <MonthGrid
+            monthStart={monthStart}
+            users={initialUsers}
+            slots={slots}
+            onMonthChange={handleMonthChange}
+          />
+        )}
+      </div>
+
       {dialog && (
         <SlotEditDialog
           open={dialog.open}

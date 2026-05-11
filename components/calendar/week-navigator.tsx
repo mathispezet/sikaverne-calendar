@@ -1,8 +1,12 @@
 "use client"
 
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 import { formatWeekRange, nextWeek, prevWeek, getWeekStart } from "@/lib/dates"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { isSameDay } from "date-fns"
 
 interface WeekNavigatorProps {
   weekStart: Date
@@ -10,6 +14,16 @@ interface WeekNavigatorProps {
 }
 
 export function WeekNavigator({ weekStart, onChange }: WeekNavigatorProps) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const currentWeekStart = getWeekStart()
+  const isCurrentWeek = isSameDay(weekStart, currentWeekStart)
+
+  const handleDaySelect = (day: Date | undefined) => {
+    if (!day) return
+    onChange(getWeekStart(day))
+    setPickerOpen(false)
+  }
+
   return (
     <div className="flex items-center justify-between mb-6 gap-4">
       <Button
@@ -21,17 +35,31 @@ export function WeekNavigator({ weekStart, onChange }: WeekNavigatorProps) {
         <ChevronLeft className="h-4 w-4" />
       </Button>
 
-      <div className="text-center">
-        <h2 className="text-xl font-semibold capitalize">
-          {formatWeekRange(weekStart)}
-        </h2>
+      <div className="flex flex-col items-center gap-1">
+        <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+          <PopoverTrigger asChild>
+            <button className="text-xl font-semibold capitalize hover:text-blue-400 transition-colors cursor-pointer">
+              {formatWeekRange(weekStart)}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="center">
+            <Calendar
+              mode="single"
+              selected={weekStart}
+              onSelect={handleDaySelect}
+              weekStartsOn={1}
+            />
+          </PopoverContent>
+        </Popover>
+
         <Button
-          variant="link"
+          variant="default"
           size="sm"
-          onClick={() => onChange(getWeekStart())}
-          className="h-auto p-0 text-xs"
+          onClick={() => onChange(currentWeekStart)}
+          disabled={isCurrentWeek}
+          className="h-6 px-2 text-xs"
         >
-          Revenir à aujourd'hui
+          Aujourd'hui
         </Button>
       </div>
 

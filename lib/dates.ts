@@ -4,6 +4,12 @@ import {
   addDays,
   addWeeks,
   subWeeks,
+  addMonths,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+  isSameMonth,
+  isSameDay,
   format,
   isToday as dateFnsIsToday,
 } from "date-fns"
@@ -49,4 +55,45 @@ export function prevWeek(date: Date): Date {
 
 export function isToday(date: Date): boolean {
   return dateFnsIsToday(date)
+}
+
+export function getMonthStart(date: Date = new Date()): Date {
+  return startOfMonth(date)
+}
+
+export function nextMonth(date: Date): Date {
+  return addMonths(date, 1)
+}
+
+export function prevMonth(date: Date): Date {
+  return subMonths(date, 1)
+}
+
+/**
+ * Renvoie toutes les semaines (lignes) d'un mois pour l'affichage grille.
+ * Chaque ligne = 7 jours lun→dim. Peut inclure des jours du mois précédent/suivant.
+ */
+export function getMonthWeeks(monthStart: Date): Date[][] {
+  const firstDay = startOfWeek(monthStart, { weekStartsOn: 1 })
+  const lastDay = endOfWeek(endOfMonth(monthStart), { weekStartsOn: 1 })
+
+  const weeks: Date[][] = []
+  let current = firstDay
+  while (current <= lastDay) {
+    weeks.push(Array.from({ length: 7 }, (_, i) => addDays(current, i)))
+    current = addDays(current, 7)
+  }
+  return weeks
+}
+
+export function isSameMonthFn(date: Date, monthStart: Date): boolean {
+  return isSameMonth(date, monthStart)
+}
+
+export function isSameDayFn(a: Date, b: Date): boolean {
+  return isSameDay(a, b)
+}
+
+export function formatMonthYear(date: Date): string {
+  return format(date, "MMMM yyyy", { locale: fr })
 }

@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/lib/db"
-import { startOfWeek, addDays, format } from "date-fns"
+import { startOfWeek, endOfWeek, addDays, startOfMonth, endOfMonth, format } from "date-fns"
 import type { User, Slot, TimeSlot, SlotStatus } from "@/lib/types"
 
 /**
@@ -84,6 +84,32 @@ export async function upsertSlot(params: {
       note: params.note,
     },
   })
+}
+
+/**
+ * Récupère tous les slots d'un mois entier
+ */
+export async function getSlotsForMonth(monthStart: Date): Promise<Slot[]> {
+  const monthEnd = endOfMonth(monthStart)
+
+  const dbSlots = await db.slot.findMany({
+    where: {
+      date: {
+        gte: startOfMonth(monthStart),
+        lte: monthEnd,
+      },
+    },
+  })
+
+  return dbSlots.map((s) => ({
+    userId: s.userId,
+    date: format(s.date, "yyyy-MM-dd"),
+    timeSlot: s.timeSlot as TimeSlot,
+    status: s.status as SlotStatus,
+    customLabel: s.customLabel ?? undefined,
+    customColor: s.customColor ?? undefined,
+    note: s.note ?? undefined,
+  }))
 }
 
 /**
