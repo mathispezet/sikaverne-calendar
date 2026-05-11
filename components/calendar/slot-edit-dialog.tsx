@@ -14,7 +14,9 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Repeat } from "lucide-react"
 import { Slot, SlotStatus, TimeSlot, STATUS_CONFIG, TIME_SLOT_CONFIG } from "@/lib/types"
+import type { RecurringRule } from "@/lib/calendar-logic"
 import { upsertSlot, deleteSlot } from "@/lib/actions/calendar"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
@@ -24,10 +26,11 @@ interface SlotEditDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   userId: string
-  date: string             // YYYY-MM-DD
+  date: string
   timeSlot: TimeSlot
-  existingSlot?: Slot      // si on édite un slot existant
-  onSave: () => void       // callback pour rafraîchir la grille
+  existingSlot?: Slot
+  inheritedRule?: RecurringRule
+  onSave: () => void
 }
 
 export function SlotEditDialog({
@@ -37,23 +40,29 @@ export function SlotEditDialog({
   date,
   timeSlot,
   existingSlot,
+  inheritedRule,
   onSave,
 }: SlotEditDialogProps) {
   const [isPending, startTransition] = useTransition()
-  const [status, setStatus] = useState<SlotStatus>(existingSlot?.status ?? "AVAILABLE")
-  const [customLabel, setCustomLabel] = useState(existingSlot?.customLabel ?? "")
-  const [customColor, setCustomColor] = useState(existingSlot?.customColor ?? "#8b5cf6")
+
+  const defaultStatus = existingSlot?.status ?? inheritedRule?.status ?? "AVAILABLE"
+  const [status, setStatus] = useState<SlotStatus>(defaultStatus)
+  const [customLabel, setCustomLabel] = useState(
+    existingSlot?.customLabel ?? inheritedRule?.customLabel ?? ""
+  )
+  const [customColor, setCustomColor] = useState(
+    existingSlot?.customColor ?? inheritedRule?.customColor ?? "#8b5cf6"
+  )
   const [note, setNote] = useState(existingSlot?.note ?? "")
 
-  // Re-init quand le slot change
   useEffect(() => {
     if (open) {
-      setStatus(existingSlot?.status ?? "AVAILABLE")
-      setCustomLabel(existingSlot?.customLabel ?? "")
-      setCustomColor(existingSlot?.customColor ?? "#8b5cf6")
+      setStatus(existingSlot?.status ?? inheritedRule?.status ?? "AVAILABLE")
+      setCustomLabel(existingSlot?.customLabel ?? inheritedRule?.customLabel ?? "")
+      setCustomColor(existingSlot?.customColor ?? inheritedRule?.customColor ?? "#8b5cf6")
       setNote(existingSlot?.note ?? "")
     }
-  }, [open, existingSlot])
+  }, [open, existingSlot, inheritedRule])
 
   const dateObj = new Date(date + "T00:00:00")
   const dateLabel = format(dateObj, "EEEE d MMMM yyyy", { locale: fr })
@@ -84,6 +93,19 @@ export function SlotEditDialog({
     })
   }
 
+  // Réinitialise à la règle récurrente en supprimant le slot override
+  const handleResetToRule = () => {
+    if (!existingSlot) return
+    startTransition(async () => {
+      await deleteSlot({ userId, date, timeSlot })
+      onSave()
+      onOpenChange(false)
+    })
+  }
+
+  const isOverridingRule = !!existingSlot && !!inheritedRule === false && !inheritedRule
+  const isInheritingRule = !existingSlot && !!inheritedRule
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md bg-slate-900 border-slate-700">
@@ -93,6 +115,13 @@ export function SlotEditDialog({
             {timeSlotLabel} — modifie ton statut
           </DialogDescription>
         </DialogHeader>
+
+        {isInheritingRule && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-slate-800 border border-slate-600 text-sm text-slate-300">
+            <Repeat className="h-4 w-4 text-blue-400 flex-shrink-0" />
+            <span>Hérité de ta règle récurrente — enregistrer créera un override pour ce jour uniquement</span>
+          </div>
+        )}
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
@@ -105,9 +134,7 @@ export function SlotEditDialog({
                     <RadioGroupItem value={key} id={`status-${key}`} />
                     <Label
                       htmlFor={`status-${key}`}
-                      className={cn(
-                        "flex items-center gap-2 cursor-pointer flex-1 py-1"
-                      )}
+                      className="flex items-center gap-2 cursor-pointer flex-1 py-1"
                     >
                       <span
                         className={cn(
@@ -167,22 +194,20 @@ export function SlotEditDialog({
 
         <DialogFooter className="flex-row justify-between sm:justify-between gap-2">
           <div>
-            {existingSlot && (
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={isPending}
-              >
+            {existingSlot && !inheritedRule && (
+              <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
                 Supprimer
+              </Button>
+            )}
+            {existingSlot && inheritedRule && (
+              <Button variant="outline" onClick={handleResetToRule} disabled={isPending}>
+                <Repeat className="h-3.5 w-3.5 mr-1.5" />
+                Réinitialiser à la règle
               </Button>
             )}
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isPending}
-            >
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
               Annuler
             </Button>
             <Button

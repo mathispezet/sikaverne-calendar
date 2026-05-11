@@ -1,22 +1,24 @@
 "use client"
 
-import { Slot, STATUS_CONFIG } from "@/lib/types"
+import { Repeat } from "lucide-react"
+import { STATUS_CONFIG } from "@/lib/types"
+import type { ResolvedSlot } from "@/lib/calendar-logic"
 import { cn } from "@/lib/utils"
 
 interface TimeSlotBlockProps {
-  slot?: Slot
+  resolved: ResolvedSlot | null
   isEditable: boolean
   onClick?: () => void
 }
 
-export function TimeSlotBlock({ slot, isEditable, onClick }: TimeSlotBlockProps) {
-  if (!slot) {
+export function TimeSlotBlock({ resolved, isEditable, onClick }: TimeSlotBlockProps) {
+  if (!resolved) {
     return (
       <button
         onClick={onClick}
         disabled={!isEditable}
         className={cn(
-          "w-full h-7 bg-slate-800 rounded text-xs text-slate-500 transition-colors",
+          "relative w-full h-7 bg-slate-800 rounded text-xs text-slate-500 transition-colors",
           isEditable && "hover:bg-slate-700 cursor-pointer",
           !isEditable && "cursor-default"
         )}
@@ -27,29 +29,33 @@ export function TimeSlotBlock({ slot, isEditable, onClick }: TimeSlotBlockProps)
     )
   }
 
-  const config = STATUS_CONFIG[slot.status]
-  const isCustom = slot.status === "CUSTOM"
-  const customStyle = isCustom && slot.customColor
-    ? { backgroundColor: slot.customColor }
+  const config = STATUS_CONFIG[resolved.status]
+  const isCustom = resolved.status === "CUSTOM"
+  const customStyle = isCustom && resolved.customColor
+    ? { backgroundColor: resolved.customColor }
     : undefined
-
-  const label = isCustom ? (slot.customLabel ?? config.label) : config.label
+  const label = isCustom ? (resolved.customLabel ?? config.label) : config.label
 
   return (
     <button
       onClick={onClick}
       disabled={!isEditable}
       className={cn(
-        "w-full h-7 rounded text-xs font-medium transition-opacity",
+        "relative w-full h-7 rounded text-xs font-medium transition-opacity",
         !isCustom && config.bgClass,
         config.textClass,
         isEditable && "hover:opacity-80 cursor-pointer",
-        !isEditable && "cursor-default opacity-90"
+        !isEditable && "cursor-default opacity-90",
+        resolved.isRecurring && "border border-dashed border-white/40"
       )}
       style={customStyle}
-      title={slot.note ?? label}
+      title={resolved.note ?? label}
+      aria-label={label}
     >
-      {label}
+      <span className="truncate px-1">{label}</span>
+      {resolved.isRecurring && (
+        <Repeat className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 opacity-70" />
+      )}
     </button>
   )
 }

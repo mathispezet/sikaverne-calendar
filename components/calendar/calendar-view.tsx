@@ -6,9 +6,10 @@ import { CalendarGrid } from "./calendar-grid"
 import { WeekNavigator } from "./week-navigator"
 import { MonthGrid } from "./month-grid"
 import { SlotEditDialog } from "./slot-edit-dialog"
-import { getSlotsForWeek, getSlotsForMonth } from "@/lib/actions/calendar"
+import { getCalendarDataForWeek, getSlotsForMonth } from "@/lib/actions/calendar"
 import { getWeekStart, getMonthStart, nextWeek, prevWeek } from "@/lib/dates"
 import type { User, Slot, TimeSlot } from "@/lib/types"
+import type { RecurringRule } from "@/lib/calendar-logic"
 
 type View = "week" | "month"
 
@@ -17,6 +18,7 @@ interface CalendarViewProps {
   initialWeekStart: string
   initialUsers: User[]
   initialSlots: Slot[]
+  initialRules: RecurringRule[]
 }
 
 interface DialogState {
@@ -25,6 +27,7 @@ interface DialogState {
   date: string
   timeSlot: TimeSlot
   existingSlot?: Slot
+  inheritedRule?: RecurringRule
 }
 
 function getInitialView(): View {
@@ -37,11 +40,13 @@ export function CalendarView({
   initialWeekStart,
   initialUsers,
   initialSlots,
+  initialRules,
 }: CalendarViewProps) {
   const [view, setView] = useState<View>(getInitialView)
   const [weekStart, setWeekStart] = useState(() => new Date(initialWeekStart))
   const [monthStart, setMonthStart] = useState(() => getMonthStart(new Date(initialWeekStart)))
   const [slots, setSlots] = useState<Slot[]>(initialSlots)
+  const [rules, setRules] = useState<RecurringRule[]>(initialRules)
   const [isPending, startTransition] = useTransition()
   const [dialog, setDialog] = useState<DialogState | null>(null)
 
@@ -52,36 +57,57 @@ export function CalendarView({
 
   const refresh = useCallback(async () => {
     if (view === "week") {
-      const fresh = await getSlotsForWeek(weekStart)
-      setSlots(fresh)
+      const { slots: s, rules: r } = await getCalendarDataForWeek(weekStart)
+      setSlots(s)
+      setRules(r)
     } else {
-      const fresh = await getSlotsForMonth(monthStart)
-      setSlots(fresh)
+      const s = await getSlotsForMonth(monthStart)
+      setSlots(s)
     }
   }, [view, weekStart, monthStart])
 
   const handleWeekChange = (newWeekStart: Date) => {
     setWeekStart(newWeekStart)
     startTransition(async () => {
-      const fresh = await getSlotsForWeek(newWeekStart)
-      setSlots(fresh)
+      const { slots: s, rules: r } = await getCalendarDataForWeek(newWeekStart)
+      setSlots(s)
+      setRules(r)
     })
   }
 
   const handleMonthChange = (newMonthStart: Date) => {
     setMonthStart(newMonthStart)
     startTransition(async () => {
-      const fresh = await getSlotsForMonth(newMonthStart)
-      setSlots(fresh)
+      const s = await getSlotsForMonth(newMonthStart)
+      setSlots(s)
     })
   }
 
   const handleSlotClick = (userId: string, date: string, timeSlot: TimeSlot) => {
     if (userId !== currentUserId) return
+
     const existingSlot = slots.find(
       (s) => s.userId === userId && s.date === date && s.timeSlot === timeSlot
     )
-    setDialog({ open: true, userId, date, timeSlot, existingSlot })
+
+    // Cherche si ce slot hérite d'une règle récurrente (pas de slot spécifique)
+    let inheritedRule: RecurringRule | undefined
+    if (!existingSlot) {
+      const dateObj = new Date(date + "T00:00:00")
+      const dayOfWeek = dateObj.getDay()
+      inheritedRule = rules.find((r) => {
+        if (r.userId !== userId || r.timeSlot !== timeSlot || r.dayOfWeek !== dayOfWeek) return false
+        const start = new Date(r.startDate + "T00:00:00")
+        if (dateObj < start) return false
+        if (r.endDate) {
+          const end = new Date(r.endDate + "T00:00:00")
+          if (dateObj > end) return false
+        }
+        return true
+      })
+    }
+
+    setDialog({ open: true, userId, date, timeSlot, existingSlot, inheritedRule })
   }
 
   // Raccourcis clavier
@@ -132,6 +158,7 @@ export function CalendarView({
               weekStart={weekStart}
               users={initialUsers}
               slots={slots}
+              rules={rules}
               currentUserId={currentUserId}
               onSlotClick={handleSlotClick}
             />
@@ -156,6 +183,7 @@ export function CalendarView({
           date={dialog.date}
           timeSlot={dialog.timeSlot}
           existingSlot={dialog.existingSlot}
+          inheritedRule={dialog.inheritedRule}
           onSave={refresh}
         />
       )}

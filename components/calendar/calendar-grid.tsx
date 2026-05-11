@@ -1,4 +1,5 @@
 import { User, Slot, TimeSlot } from "@/lib/types"
+import type { RecurringRule } from "@/lib/calendar-logic"
 import { getWeekDays, formatDayHeader, isToday } from "@/lib/dates"
 import { format } from "date-fns"
 import { DayCell } from "./day-cell"
@@ -8,6 +9,7 @@ interface CalendarGridProps {
   weekStart: Date
   users: User[]
   slots: Slot[]
+  rules: RecurringRule[]
   currentUserId: string
   onSlotClick: (userId: string, date: string, timeSlot: TimeSlot) => void
 }
@@ -16,6 +18,7 @@ export function CalendarGrid({
   weekStart,
   users,
   slots,
+  rules,
   currentUserId,
   onSlotClick,
 }: CalendarGridProps) {
@@ -78,6 +81,7 @@ export function CalendarGrid({
                         userId={user.id}
                         date={dateStr}
                         slots={slots}
+                        rules={rules}
                         isEditable={isCurrentUser}
                         onSlotClick={onSlotClick}
                       />
