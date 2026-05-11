@@ -1,0 +1,65 @@
+# Production stack — à déposer dans ~/services/sikaverne-calendar/ sur le serveur OVH
+# Variables d'environnement dans .env.production (ne pas committer)
+#
+# Déploiement initial :
+#   docker compose up -d --build
+#   docker compose logs -f calendar-migrate   # attendre "migrate deploy done"
+#   docker compose logs -f calendar-app       # attendre "Ready"
+#
+# Mise à jour :
+#   git pull && docker compose up -d --build
+
+services:
+  calendar-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sikaverne
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: sikaverne_calendar
+    volumes:
+      - calendar-db-data:/var/lib/postgresql/data
+    networks:
+      - calendar-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sikaverne -d sikaverne_calendar"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  calendar-migrate:
+    build: .
+    restart: "no"
+    command: npx prisma migrate deploy
+    env_file: .env.production
+    depends_on:
+      calendar-db:
+        condition: service_healthy
+    networks:
+      - calendar-internal
+
+  calendar-app:
+    build: .
+    restart: unless-stopped
+    env_file: .env.production
+    depends_on:
+      calendar-migrate:
+        condition: service_completed_successfully
+    networks:
+      - proxy
+      - calendar-internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.calendar.rule=Host(`calendar.la-sikaverne.fr`)"
+      - "traefik.http.routers.calendar.entrypoints=websecure"
+      - "traefik.http.routers.calendar.tls=true"
+      - "traefik.http.services.calendar.loadbalancer.server.port=3000"
+
+volumes:
+  calendar-db-data:
+
+networks:
+  proxy:
+    external: true
+  calendar-internal:
+    internal: true
