@@ -50,16 +50,12 @@ export function SlotEditDialog({
   const [customLabel, setCustomLabel] = useState(
     existingSlot?.customLabel ?? inheritedRule?.customLabel ?? ""
   )
-  const [customColor, setCustomColor] = useState(
-    existingSlot?.customColor ?? inheritedRule?.customColor ?? "#8b5cf6"
-  )
   const [note, setNote] = useState(existingSlot?.note ?? "")
 
   useEffect(() => {
     if (open) {
       setStatus(existingSlot?.status ?? inheritedRule?.status ?? "AVAILABLE")
       setCustomLabel(existingSlot?.customLabel ?? inheritedRule?.customLabel ?? "")
-      setCustomColor(existingSlot?.customColor ?? inheritedRule?.customColor ?? "#8b5cf6")
       setNote(existingSlot?.note ?? "")
     }
   }, [open, existingSlot, inheritedRule])
@@ -76,7 +72,7 @@ export function SlotEditDialog({
         timeSlot,
         status,
         customLabel: status === "CUSTOM" ? customLabel : undefined,
-        customColor: status === "CUSTOM" ? customColor : undefined,
+        customColor: status === "CUSTOM" ? "#8b5cf6" : undefined,
         note: note.trim() || undefined,
       })
       onSave()
@@ -140,8 +136,8 @@ export function SlotEditDialog({
                         className={cn(
                           "inline-block w-4 h-4 rounded ring-1 ring-white/30",
                           key !== "CUSTOM" && config.bgClass,
+                          key === "CUSTOM" && "bg-violet-500",
                         )}
-                        style={key === "CUSTOM" ? { backgroundColor: customColor } : undefined}
                       />
                       <span>{config.label}</span>
                     </Label>
@@ -162,19 +158,6 @@ export function SlotEditDialog({
                   onChange={(e) => setCustomLabel(e.target.value)}
                   maxLength={20}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="customColor">Couleur</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="customColor"
-                    type="color"
-                    value={customColor}
-                    onChange={(e) => setCustomColor(e.target.value)}
-                    className="w-16 h-10 p-1 cursor-pointer"
-                  />
-                  <span className="text-sm text-muted-foreground">{customColor}</span>
-                </div>
               </div>
             </div>
           )}

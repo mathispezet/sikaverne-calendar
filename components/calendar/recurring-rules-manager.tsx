@@ -97,7 +97,7 @@ export function RecurringRulesManager({ userId, initialRules }: RecurringRulesMa
         timeSlot: form.timeSlot,
         status: form.status,
         customLabel: form.status === "CUSTOM" ? form.customLabel : undefined,
-        customColor: form.status === "CUSTOM" ? form.customColor : undefined,
+        customColor: form.status === "CUSTOM" ? "#8b5cf6" : undefined,
         startDate: form.startDate,
         endDate: form.endDate || undefined,
       })
@@ -264,8 +264,7 @@ export function RecurringRulesManager({ userId, initialRules }: RecurringRulesMa
                       <RadioGroupItem value={key} id={`rule-status-${key}`} />
                       <Label htmlFor={`rule-status-${key}`} className="flex items-center gap-2 cursor-pointer flex-1 py-1">
                         <span
-                          className={cn("inline-block w-4 h-4 rounded", key !== "CUSTOM" && config.bgClass)}
-                          style={key === "CUSTOM" ? { backgroundColor: form.customColor } : undefined}
+                          className={cn("inline-block w-4 h-4 rounded ring-1 ring-white/30", key !== "CUSTOM" && config.bgClass, key === "CUSTOM" && "bg-violet-500")}
                         />
                         <span>{config.label}</span>
                       </Label>
@@ -286,19 +285,6 @@ export function RecurringRulesManager({ userId, initialRules }: RecurringRulesMa
                     onChange={(e) => setForm((f) => ({ ...f, customLabel: e.target.value }))}
                     maxLength={20}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="rule-customColor">Couleur</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="rule-customColor"
-                      type="color"
-                      value={form.customColor}
-                      onChange={(e) => setForm((f) => ({ ...f, customColor: e.target.value }))}
-                      className="w-16 h-10 p-1 cursor-pointer"
-                    />
-                    <span className="text-sm text-muted-foreground">{form.customColor}</span>
-                  </div>
                 </div>
               </div>
             )}
