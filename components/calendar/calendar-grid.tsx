@@ -1,4 +1,4 @@
-import { User, Slot, TimeSlot } from "@/lib/types"
+import { User, Slot, TimeSlot, TIME_SLOT_CONFIG } from "@/lib/types"
 import type { RecurringRule } from "@/lib/calendar-logic"
 import { getWeekDays, formatDayHeader, isToday } from "@/lib/dates"
 import { format } from "date-fns"
@@ -48,6 +48,30 @@ export function CalendarGrid({
           </tr>
         </thead>
         <tbody>
+          {/* Ligne légende matin/aprem/soir */}
+          <tr className="border-t border-border">
+            <td className="sticky left-0 bg-background z-10 p-2 sm:p-3 border-r border-border">
+              <div className="flex flex-col gap-0.5 sm:gap-1 py-0.5">
+                {(["MORNING", "AFTERNOON", "EVENING"] as TimeSlot[]).map((ts) => (
+                  <div
+                    key={ts}
+                    className="h-6 sm:h-7 flex items-center text-[10px] sm:text-xs text-muted-foreground font-medium"
+                  >
+                    {TIME_SLOT_CONFIG[ts].label}
+                  </div>
+                ))}
+              </div>
+            </td>
+            {days.map((day) => (
+              <td
+                key={day.toISOString()}
+                className={cn(
+                  "border-r border-border last:border-r-0",
+                  isToday(day) && "bg-blue-950/20"
+                )}
+              />
+            ))}
+          </tr>
           {users.map((user) => {
             const isCurrentUser = user.id === currentUserId
             return (

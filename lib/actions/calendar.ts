@@ -7,6 +7,12 @@ import type { RecurringRule } from "@/lib/calendar-logic"
 
 export async function getUsers(): Promise<User[]> {
   const dbUsers = await db.user.findMany({
+    where: {
+      // Uniquement les users qui se sont déjà connectés via Authentik
+      authentikId: { not: null },
+      // Exclure le compte admin Authentik
+      NOT: { username: "akadmin" },
+    },
     orderBy: { displayName: "asc" },
   })
   return dbUsers.map((u) => ({
