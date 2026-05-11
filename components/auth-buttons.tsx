@@ -15,18 +15,11 @@ export async function SignIn() {
 }
 
 export async function SignOut() {
-  // Après le logout Auth.js, on redirige vers l'endpoint end_session d'Authentik
-  // pour invalider aussi la session côté IdP
-  const issuer = process.env.AUTH_AUTHENTIK_ISSUER ?? ""
-  const clientId = process.env.AUTH_AUTHENTIK_ID ?? ""
-  const appUrl = process.env.AUTH_URL ?? "http://localhost:3000"
-  const endSessionUrl = `${issuer}end-session/?client_id=${clientId}&post_logout_redirect_uri=${encodeURIComponent(appUrl)}`
-
   return (
     <form
       action={async () => {
         "use server"
-        await signOut({ redirectTo: endSessionUrl })
+        await signOut({ redirectTo: "/" })
       }}
     >
       <Button type="submit" variant="outline">Se déconnecter</Button>
