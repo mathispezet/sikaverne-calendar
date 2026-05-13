@@ -1,2 +1,0 @@
-Corriger un bug sur l'edit de régles déjà existante, à tendance à ne pas prendre en compte les changements.
-Rendre plus cohérent l'affichage du bouton "aujourd'hui" ce n'est pas clair qu'il est cliquable et qu'il permet de revenir au jour actuel

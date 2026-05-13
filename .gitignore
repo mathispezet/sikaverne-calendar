@@ -47,3 +47,5 @@ next-env.d.ts
 .env
 .env*.local
 /app/generated/prisma
+
+notes.txt
