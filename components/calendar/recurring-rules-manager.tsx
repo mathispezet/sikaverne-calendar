@@ -70,11 +70,15 @@ function defaultForm(): RuleFormState {
   const monday = new Date(today)
   monday.setDate(today.getDate() - today.getDay() + 1)
   const weekStartStr = format(monday, "yyyy-MM-dd")
+  const initialDay = today.getDay()
   return {
     ruleSetId: null,
     ruleSetName: "Règle",
-    daysOfWeek: [today.getDay()],
-    slots: {},
+    daysOfWeek: [initialDay],
+    // Important : initialiser les slots pour le jour par défaut, sinon
+    // setSlotStatus / setSlotLabel plantent au premier clic (TypeError sur
+    // undefined[ts]) et Next.js bascule sur la not-found page.
+    slots: { [initialDay]: defaultDaySlots() },
     startDate: format(today, "yyyy-MM-dd"),
     endDate: "",
     noEndDate: true,
@@ -259,22 +263,30 @@ export function RecurringRulesManager({ userId, initialRules }: RecurringRulesMa
   }
 
   const setSlotStatus = (day: number, ts: TimeSlot, status: SlotStatus) =>
-    setForm((f) => ({
-      ...f,
-      slots: {
-        ...f.slots,
-        [day]: { ...f.slots[day], [ts]: { ...f.slots[day][ts], status } },
-      },
-    }))
+    setForm((f) => {
+      const daySlots = f.slots[day] ?? defaultDaySlots()
+      const slotCfg = daySlots[ts] ?? defaultSlotConfig()
+      return {
+        ...f,
+        slots: {
+          ...f.slots,
+          [day]: { ...daySlots, [ts]: { ...slotCfg, status } },
+        },
+      }
+    })
 
   const setSlotLabel = (day: number, ts: TimeSlot, customLabel: string) =>
-    setForm((f) => ({
-      ...f,
-      slots: {
-        ...f.slots,
-        [day]: { ...f.slots[day], [ts]: { ...f.slots[day][ts], customLabel } },
-      },
-    }))
+    setForm((f) => {
+      const daySlots = f.slots[day] ?? defaultDaySlots()
+      const slotCfg = daySlots[ts] ?? defaultSlotConfig()
+      return {
+        ...f,
+        slots: {
+          ...f.slots,
+          [day]: { ...daySlots, [ts]: { ...slotCfg, customLabel } },
+        },
+      }
+    })
 
   const toggleDay = (day: number) =>
     setForm((f) => {
