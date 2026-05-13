@@ -3,6 +3,8 @@ import type { Slot, TimeSlot, SlotStatus } from "@/lib/types"
 export interface RecurringRule {
   id: string
   userId: string
+  ruleSetId: string | undefined
+  ruleSetName: string | undefined
   dayOfWeek: number
   timeSlot: TimeSlot
   status: SlotStatus
@@ -10,6 +12,9 @@ export interface RecurringRule {
   customColor?: string
   startDate: string  // YYYY-MM-DD
   endDate?: string   // YYYY-MM-DD | undefined = infini
+  rhythm?: number    // rythme : 1 = toutes les semaines, 2 = 1 sem/2, etc.
+  rhythmWeekStart?: string // YYYY-MM-DD, date de référence pour le cycle
+  priority?: number // priorité plus haute = écrase les règles en dessous
 }
 
 export interface ResolvedSlot {
@@ -57,7 +62,7 @@ export function resolveSlot(
   // getDay() retourne 0=dim, 1=lun... — même convention que le schéma
   const dayOfWeek = dateObj.getDay()
 
-  const rule = rules.find((r) => {
+  const matchingRules = rules.filter((r) => {
     if (r.userId !== userId) return false
     if (r.timeSlot !== timeSlot) return false
     if (r.dayOfWeek !== dayOfWeek) return false
@@ -67,21 +72,32 @@ export function resolveSlot(
       const end = new Date(r.endDate + "T00:00:00")
       if (dateObj > end) return false
     }
+    // Rythme alterné : vérifier que la semaine correspond au cycle
+    if (r.rhythm && r.rhythm > 1 && r.rhythmWeekStart) {
+      const rhythmStart = new Date(r.rhythmWeekStart + "T00:00:00")
+      const diffMs = dateObj.getTime() - rhythmStart.getTime()
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+      const weekNum = Math.floor(diffDays / 7)
+      if (weekNum % r.rhythm !== 0) return false
+    }
     return true
   })
 
-  if (rule) {
-    return {
-      userId,
-      date,
-      timeSlot,
-      status: rule.status,
-      customLabel: rule.customLabel,
-      customColor: rule.customColor,
-      isRecurring: true,
-      recurringRuleId: rule.id,
-    }
-  }
+  if (matchingRules.length === 0) return null
 
-  return null
+  // Si plusieurs règles matchent, celle avec la priorité la plus haute l'emporte
+  const rule = matchingRules.reduce((a, b) =>
+    (a.priority ?? 0) >= (b.priority ?? 0) ? a : b
+  )
+
+  return {
+    userId,
+    date,
+    timeSlot,
+    status: rule.status,
+    customLabel: rule.customLabel,
+    customColor: rule.customColor,
+    isRecurring: true,
+    recurringRuleId: rule.id,
+  }
 }

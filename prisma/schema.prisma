@@ -58,20 +58,27 @@ model Slot {
 }
 
 model RecurringRule {
-  id           String     @id @default(cuid())
-  userId       String
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dayOfWeek    Int
-  timeSlot     TimeSlot
-  status       SlotStatus
-  customLabel  String?
-  customColor  String?
-  startDate    DateTime   @db.Date
-  endDate      DateTime?  @db.Date
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id              String     @id @default(cuid())
+  userId          String
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ruleSetId       String?
+  ruleSetName     String?
+  dayOfWeek       Int
+  timeSlot        TimeSlot
+  status          SlotStatus
+  customLabel     String?
+  customColor     String?
+  startDate       DateTime   @db.Date
+  endDate         DateTime?  @db.Date
+  rhythm          Int        @default(1)
+  rhythmWeekStart DateTime?  @db.Date
+  priority        Int        @default(0) // priorité plus haute = écrase les règles en dessous
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
+  @@index([userId, ruleSetId])
   @@index([userId, dayOfWeek, timeSlot])
+  @@index([userId, priority])
 }
 
 // === Tables Auth.js ===

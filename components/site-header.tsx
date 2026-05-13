@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { auth } from "@/auth"
 import { SignOut } from "@/components/auth-buttons"
-import { CalendarDays, Repeat } from "lucide-react"
+import { CalendarDays, Repeat, Users } from "lucide-react"
 
 export async function SiteHeader() {
   const session = await auth()
@@ -21,6 +21,13 @@ export async function SiteHeader() {
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Calendrier
+              </Link>
+              <Link
+                href="/calendar/common"
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Users className="h-3.5 w-3.5" />
+                Créneaux communs
               </Link>
               <Link
                 href="/calendar/recurring"

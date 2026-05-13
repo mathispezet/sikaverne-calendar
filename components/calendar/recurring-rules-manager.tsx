@@ -21,51 +21,75 @@ import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 
 const DAY_LABELS: Record<number, string> = {
-  0: "Dimanche",
-  1: "Lundi",
-  2: "Mardi",
-  3: "Mercredi",
-  4: "Jeudi",
-  5: "Vendredi",
-  6: "Samedi",
+  0: "Dim",
+  1: "Lun",
+  2: "Mar",
+  3: "Mer",
+  4: "Jeu",
+  5: "Ven",
+  6: "Sam",
 }
 
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
 const TIME_SLOTS: TimeSlot[] = ["MORNING", "AFTERNOON", "EVENING"]
 
-// Un statut + label par créneau
 interface SlotConfig {
   status: SlotStatus
   customLabel: string
 }
 
+type DaySlots = Record<TimeSlot, SlotConfig>
+
 interface RuleFormState {
-  // En mode édition, on stocke les IDs existants par créneau pour faire un update
-  existingIds: Partial<Record<TimeSlot, string>>
-  dayOfWeek: number
-  slots: Record<TimeSlot, SlotConfig>
+  ruleSetId: string | null
+  ruleSetName: string
+  daysOfWeek: number[]
+  slots: Record<number, DaySlots>
   startDate: string
   endDate: string
   noEndDate: boolean
+  rhythm: number
+  rhythmWeekStart: string
+  priority: number
 }
 
 function defaultSlotConfig(): SlotConfig {
   return { status: "AVAILABLE", customLabel: "" }
 }
 
-function defaultForm(): RuleFormState {
+function defaultDaySlots(): DaySlots {
   return {
-    existingIds: {},
-    dayOfWeek: 1,
-    slots: {
-      MORNING: defaultSlotConfig(),
-      AFTERNOON: defaultSlotConfig(),
-      EVENING: defaultSlotConfig(),
-    },
-    startDate: format(new Date(), "yyyy-MM-dd"),
+    MORNING: defaultSlotConfig(),
+    AFTERNOON: defaultSlotConfig(),
+    EVENING: defaultSlotConfig(),
+  }
+}
+
+function defaultForm(): RuleFormState {
+  const today = new Date()
+  const monday = new Date(today)
+  monday.setDate(today.getDate() - today.getDay() + 1)
+  const weekStartStr = format(monday, "yyyy-MM-dd")
+  return {
+    ruleSetId: null,
+    ruleSetName: "Règle",
+    daysOfWeek: [today.getDay()],
+    slots: {},
+    startDate: format(today, "yyyy-MM-dd"),
     endDate: "",
     noEndDate: true,
+    rhythm: 1,
+    rhythmWeekStart: weekStartStr,
+    priority: 0,
   }
+}
+
+function buildSlotsForDays(daysOfWeek: number[]): Record<number, DaySlots> {
+  const slots: Record<number, DaySlots> = {}
+  for (const d of daysOfWeek) {
+    slots[d] = defaultDaySlots()
+  }
+  return slots
 }
 
 interface RecurringRulesManagerProps {
@@ -79,254 +103,439 @@ export function RecurringRulesManager({ userId, initialRules }: RecurringRulesMa
   const [form, setForm] = useState<RuleFormState>(defaultForm())
   const [isPending, startTransition] = useTransition()
 
+  const bySet = Object.values(
+    rules.reduce<Record<string, {
+      ruleSetId: string
+      ruleSetName: string
+      rules: RecurringRule[]
+      rhythm: number
+      rhythmWeekStart: string
+      startDate: string
+      endDate: string
+      priority: number
+    }>>((acc, r) => {
+      const id = r.ruleSetId ?? r.id
+      if (!acc[id]) {
+        acc[id] = {
+          ruleSetId: id,
+          ruleSetName: r.ruleSetName ?? "Règle",
+          rules: [],
+          rhythm: r.rhythm ?? 1,
+          rhythmWeekStart: r.rhythmWeekStart ?? "",
+          startDate: r.startDate,
+          endDate: r.endDate ?? "",
+          priority: r.priority ?? 0,
+        }
+      }
+      acc[id].rules.push(r)
+      return acc
+    }, {})
+  )
+
   const openCreate = () => {
     setForm(defaultForm())
     setDialogOpen(true)
   }
 
-  // Ouvre le dialog en mode édition pour toutes les règles d'un jour donné
-  const openEditDay = (day: number) => {
-    const dayRules = rules.filter((r) => r.dayOfWeek === day)
-    const first = dayRules[0]
-    const existingIds: Partial<Record<TimeSlot, string>> = {}
-    const slots: Record<TimeSlot, SlotConfig> = {
-      MORNING: defaultSlotConfig(),
-      AFTERNOON: defaultSlotConfig(),
-      EVENING: defaultSlotConfig(),
+  const openEditSet = (ruleSetId: string) => {
+    const set = bySet.find((s) => s.ruleSetId === ruleSetId)
+    if (!set) return
+
+    const days = [...new Set(set.rules.map((r) => r.dayOfWeek))]
+    const slots: Record<number, DaySlots> = {}
+    for (const d of days) {
+      slots[d] = {
+        MORNING: defaultSlotConfig(),
+        AFTERNOON: defaultSlotConfig(),
+        EVENING: defaultSlotConfig(),
+      }
     }
-    for (const r of dayRules) {
-      existingIds[r.timeSlot] = r.id
-      slots[r.timeSlot] = { status: r.status, customLabel: r.customLabel ?? "" }
+    for (const r of set.rules) {
+      slots[r.dayOfWeek][r.timeSlot] = {
+        status: r.status,
+        customLabel: r.customLabel ?? "",
+      }
     }
+
     setForm({
-      existingIds,
-      dayOfWeek: day,
+      ruleSetId: set.ruleSetId,
+      ruleSetName: set.ruleSetName,
+      daysOfWeek: days,
       slots,
-      startDate: first?.startDate ?? format(new Date(), "yyyy-MM-dd"),
-      endDate: first?.endDate ?? "",
-      noEndDate: !first?.endDate,
+      startDate: set.startDate,
+      endDate: set.endDate,
+      noEndDate: !set.endDate,
+      rhythm: set.rhythm ?? 1,
+      rhythmWeekStart: set.rhythmWeekStart ?? format(new Date(), "yyyy-MM-dd"),
+      priority: set.rules[0]?.priority ?? 0,
     })
     setDialogOpen(true)
   }
 
   const handleSave = () => {
     startTransition(async () => {
+      const ruleSetId = form.ruleSetId ?? crypto.randomUUID()
+
+      const existingRules = rules.filter((r) => (r.ruleSetId ?? r.id) === ruleSetId)
+      const existingDays = new Set(existingRules.map((r) => r.dayOfWeek))
+      const newDays = new Set(form.daysOfWeek)
+
+      const daysToDelete = [...existingDays].filter((d) => !newDays.has(d))
+      const daysToCreate = [...newDays].filter((d) => !existingDays.has(d))
+
+      await Promise.all(
+        existingRules
+          .filter((r) => daysToDelete.includes(r.dayOfWeek))
+          .map((r) => deleteRecurringRule(r.id))
+      )
+
       const saved: RecurringRule[] = []
-      for (const ts of TIME_SLOTS) {
-        const slotCfg = form.slots[ts]
-        const r = await upsertRecurringRule({
-          id: form.existingIds[ts],
-          userId,
-          dayOfWeek: form.dayOfWeek,
-          timeSlot: ts,
-          status: slotCfg.status,
-          customLabel: slotCfg.status === "CUSTOM" ? slotCfg.customLabel : undefined,
-          customColor: slotCfg.status === "CUSTOM" ? "#8b5cf6" : undefined,
-          startDate: form.startDate,
-          endDate: form.noEndDate ? undefined : (form.endDate || undefined),
-        })
-        saved.push(r)
+
+      // Jours existants conservés → update
+      for (const day of [...existingDays]) {
+        if (daysToDelete.includes(day)) continue
+        for (const ts of TIME_SLOTS) {
+          const daySlots = form.slots[day] ?? defaultDaySlots()
+          const slotCfg = daySlots[ts] ?? defaultSlotConfig()
+          const existingRule = existingRules.find(
+            (r) => r.dayOfWeek === day && r.timeSlot === ts
+          )
+          const r = await upsertRecurringRule({
+            id: existingRule?.id,
+            userId,
+            dayOfWeek: day,
+            timeSlot: ts,
+            status: slotCfg.status,
+            customLabel: slotCfg.status === "CUSTOM" ? slotCfg.customLabel : undefined,
+            customColor: slotCfg.status === "CUSTOM" ? "#8b5cf6" : undefined,
+            startDate: form.startDate,
+            endDate: form.noEndDate ? undefined : (form.endDate || undefined),
+            rhythm: form.rhythm,
+            rhythmWeekStart: form.rhythm === 1 ? undefined : form.rhythmWeekStart,
+            ruleSetId,
+            ruleSetName: form.ruleSetName,
+            priority: form.priority,
+          })
+          saved.push(r)
+        }
       }
 
-      setRules((prev) => {
-        // Retire les anciennes règles du jour, ajoute les nouvelles
-        const withoutDay = prev.filter((r) => r.dayOfWeek !== form.dayOfWeek)
-        return [...withoutDay, ...saved]
-      })
+      // Nouveaux jours → create
+      for (const day of daysToCreate) {
+        for (const ts of TIME_SLOTS) {
+          const daySlots = form.slots[day] ?? defaultDaySlots()
+          const slotCfg = daySlots[ts] ?? defaultSlotConfig()
+          const r = await upsertRecurringRule({
+            userId,
+            dayOfWeek: day,
+            timeSlot: ts,
+            status: slotCfg.status,
+            customLabel: slotCfg.status === "CUSTOM" ? slotCfg.customLabel : undefined,
+            customColor: slotCfg.status === "CUSTOM" ? "#8b5cf6" : undefined,
+            startDate: form.startDate,
+            endDate: form.noEndDate ? undefined : (form.endDate || undefined),
+            rhythm: form.rhythm,
+            rhythmWeekStart: form.rhythm === 1 ? undefined : form.rhythmWeekStart,
+            ruleSetId,
+            ruleSetName: form.ruleSetName,
+            priority: form.priority,
+          })
+          saved.push(r)
+        }
+      }
+
+      const otherRules = rules.filter((r) => (r.ruleSetId ?? r.id) !== ruleSetId)
+      setRules([...otherRules, ...saved])
       setDialogOpen(false)
     })
   }
 
-  const handleDeleteDay = (day: number) => {
-    const dayRules = rules.filter((r) => r.dayOfWeek === day)
+  const handleDeleteSet = (ruleSetId: string) => {
+    const rulesToDelete = rules.filter((r) => (r.ruleSetId ?? r.id) === ruleSetId)
     startTransition(async () => {
-      await Promise.all(dayRules.map((r) => deleteRecurringRule(r.id)))
-      setRules((prev) => prev.filter((r) => r.dayOfWeek !== day))
+      await Promise.all(rulesToDelete.map((r) => deleteRecurringRule(r.id)))
+      setRules((prev) => prev.filter((r) => (r.ruleSetId ?? r.id) !== ruleSetId))
     })
   }
 
-  const setSlotStatus = (ts: TimeSlot, status: SlotStatus) =>
-    setForm((f) => ({ ...f, slots: { ...f.slots, [ts]: { ...f.slots[ts], status } } }))
+  const setSlotStatus = (day: number, ts: TimeSlot, status: SlotStatus) =>
+    setForm((f) => ({
+      ...f,
+      slots: {
+        ...f.slots,
+        [day]: { ...f.slots[day], [ts]: { ...f.slots[day][ts], status } },
+      },
+    }))
 
-  const setSlotLabel = (ts: TimeSlot, customLabel: string) =>
-    setForm((f) => ({ ...f, slots: { ...f.slots, [ts]: { ...f.slots[ts], customLabel } } }))
+  const setSlotLabel = (day: number, ts: TimeSlot, customLabel: string) =>
+    setForm((f) => ({
+      ...f,
+      slots: {
+        ...f.slots,
+        [day]: { ...f.slots[day], [ts]: { ...f.slots[day][ts], customLabel } },
+      },
+    }))
 
-  // Grouper par jour de la semaine
-  const byDay = DAY_ORDER.map((day) => ({
-    day,
-    rules: rules.filter((r) => r.dayOfWeek === day),
-  })).filter((g) => g.rules.length > 0)
+  const toggleDay = (day: number) =>
+    setForm((f) => {
+      const exists = f.daysOfWeek.includes(day)
+      if (exists && f.daysOfWeek.length === 1) return f
+      const newDays = exists
+        ? f.daysOfWeek.filter((d) => d !== day)
+        : [...f.daysOfWeek, day].sort()
+      const newSlots = { ...f.slots }
+      if (!exists) {
+        newSlots[day] = defaultDaySlots()
+      }
+      return { ...f, daysOfWeek: newDays, slots: newSlots }
+    })
 
   const canSave =
+    !!form.ruleSetName.trim() &&
+    form.daysOfWeek.length > 0 &&
     !!form.startDate &&
     (form.noEndDate || !!form.endDate) &&
-    TIME_SLOTS.every(
-      (ts) => form.slots[ts].status !== "CUSTOM" || form.slots[ts].customLabel.trim()
+    (form.rhythm === 1 || !!form.rhythmWeekStart) &&
+    form.daysOfWeek.every((day) =>
+      TIME_SLOTS.every(
+        (ts) =>
+          form.slots[day]?.[ts]?.status !== "CUSTOM" ||
+          form.slots[day]?.[ts]?.customLabel.trim()
+      )
     )
 
   return (
     <div className="space-y-6">
       <Button onClick={openCreate} className="gap-2">
         <Plus className="h-4 w-4" />
-        Ajouter une règle
+        Nouveau set de règles
       </Button>
 
-      {rules.length === 0 ? (
+      {bySet.length === 0 ? (
         <div className="text-center py-12 text-slate-400 border border-dashed border-slate-700 rounded-lg">
           <Repeat className="h-8 w-8 mx-auto mb-3 opacity-40" />
-          <p>Aucune règle. Crée-en une pour automatiser ton planning.</p>
+          <p>Aucune règle. Crée un set pour automatiser ton planning.</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {byDay.map(({ day, rules: dayRules }) => (
-            <div
-              key={day}
-              className="p-3 rounded-lg bg-slate-800 border border-slate-700"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold">{DAY_LABELS[day]}</h3>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openEditDay(day)}
-                    aria-label="Modifier"
-                    className="h-7 w-7"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteDay(day)}
-                    disabled={isPending}
-                    aria-label="Supprimer"
-                    className="h-7 w-7 text-rose-400 hover:text-rose-300"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                {TIME_SLOTS.map((ts) => {
-                  const rule = dayRules.find((r) => r.timeSlot === ts)
-                  if (!rule) return (
-                    <div key={ts} className="flex-1 text-center text-xs text-slate-600 py-1">—</div>
-                  )
-                  const config = STATUS_CONFIG[rule.status]
-                  const isCustom = rule.status === "CUSTOM"
-                  const label = isCustom ? (rule.customLabel ?? "Autre") : config.label
-                  return (
-                    <div key={ts} className="flex-1 text-center">
-                      <div className="text-[10px] text-slate-500 mb-0.5">{TIME_SLOT_CONFIG[ts].label}</div>
-                      <span
-                        className={cn(
-                          "inline-block px-2 py-0.5 rounded text-xs font-medium text-white",
-                          !isCustom && config.bgClass
-                        )}
-                        style={isCustom ? { backgroundColor: "#8b5cf6" } : undefined}
-                      >
-                        {label}
+          {bySet.map((set) => {
+            const sortedDays = [...new Set(set.rules.map((r) => r.dayOfWeek))].sort(
+              (a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b)
+            )
+            return (
+              <div
+                key={set.ruleSetId}
+                className="p-4 rounded-lg bg-slate-800 border border-slate-700"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Repeat className="h-4 w-4 text-blue-400" />
+                    <h3 className="text-sm font-semibold">{set.ruleSetName}</h3>
+                    {set.priority > 0 && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-900/60 text-violet-300 border border-violet-700/50">
+                        ↑ {set.priority}
                       </span>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEditSet(set.ruleSetId)}
+                      aria-label="Modifier"
+                      className="h-7 w-7"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteSet(set.ruleSetId)}
+                      disabled={isPending}
+                      aria-label="Supprimer"
+                      className="h-7 w-7 text-rose-400 hover:text-rose-300"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* En-tête créneaux */}
+                <div className="flex gap-2 mb-1 pl-12">
+                  {TIME_SLOTS.map((ts) => (
+                    <div key={ts} className="flex-1 text-center text-[10px] text-slate-500 uppercase tracking-wide">
+                      {TIME_SLOT_CONFIG[ts].label}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Une ligne par jour */}
+                {sortedDays.map((day) => {
+                  const dayRules = set.rules.filter((r) => r.dayOfWeek === day)
+                  return (
+                    <div key={day} className="flex items-center gap-2 mb-1">
+                      <span className="w-12 text-xs text-slate-400 flex-shrink-0">
+                        {DAY_LABELS[day]}
+                      </span>
+                      <div className="flex gap-2 flex-1">
+                        {TIME_SLOTS.map((ts) => {
+                          const rule = dayRules.find((r) => r.timeSlot === ts)
+                          if (!rule) return (
+                            <div key={ts} className="flex-1 text-center text-xs text-slate-600">—</div>
+                          )
+                          const config = STATUS_CONFIG[rule.status]
+                          const isCustom = rule.status === "CUSTOM"
+                          const label = isCustom ? (rule.customLabel ?? "Autre") : config.label
+                          return (
+                            <div key={ts} className="flex-1 text-center">
+                              <span
+                                className={cn(
+                                  "inline-block px-2 py-0.5 rounded text-xs font-medium text-white",
+                                  !isCustom && config.bgClass
+                                )}
+                                style={isCustom ? { backgroundColor: "#8b5cf6" } : undefined}
+                              >
+                                {label}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
                   )
                 })}
-              </div>
-              {dayRules[0] && (
-                <div className="text-xs text-slate-500 mt-2">
-                  Depuis le {format(new Date(dayRules[0].startDate + "T00:00:00"), "d MMM yyyy", { locale: fr })}
-                  {dayRules[0].endDate
-                    ? ` jusqu'au ${format(new Date(dayRules[0].endDate + "T00:00:00"), "d MMM yyyy", { locale: fr })}`
-                    : " · sans date de fin"}
+
+                {/* Rythme */}
+                <div className="flex items-center gap-2 mt-2 text-xs text-slate-500">
+                  <span>Depuis le {format(new Date(set.startDate + "T00:00:00"), "d MMM yyyy", { locale: fr })}</span>
+                  {set.endDate
+                    ? <span>· jusqu&apos;au {format(new Date(set.endDate + "T00:00:00"), "d MMM yyyy", { locale: fr })}</span>
+                    : <span>· sans date de fin</span>}
+                  {set.rhythm > 1 && (
+                    <span className="px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-300 border border-blue-700/40 font-medium">
+                      1/{set.rhythm}
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+              </div>
+            )
+          })}
         </div>
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg bg-slate-900 border-slate-700 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl bg-slate-900 border-slate-700 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {Object.keys(form.existingIds).length > 0 ? "Modifier la règle" : "Nouvelle règle récurrente"}
+              {form.ruleSetId ? "Modifier le set" : "Nouveau set de règles"}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-5 py-2">
-            {/* Jour */}
+            {/* Nom du set */}
             <div className="space-y-2">
-              <Label>Jour de la semaine</Label>
-              <div className="grid grid-cols-4 gap-1.5">
+              <Label htmlFor="ruleSetName">Nom du set</Label>
+              <Input
+                id="ruleSetName"
+                placeholder="Ex: Semaine A, Dispo fixe, Alternance..."
+                value={form.ruleSetName}
+                onChange={(e) => setForm((f) => ({ ...f, ruleSetName: e.target.value }))}
+                maxLength={40}
+              />
+            </div>
+
+            {/* Jours */}
+            <div className="space-y-2">
+              <Label>Jours</Label>
+              <div className="flex gap-1.5 flex-wrap">
                 {DAY_ORDER.map((day) => (
                   <button
                     key={day}
                     type="button"
-                    onClick={() => setForm((f) => ({ ...f, dayOfWeek: day }))}
+                    onClick={() => toggleDay(day)}
                     className={cn(
-                      "py-1.5 px-2 rounded text-xs font-medium transition-colors",
-                      form.dayOfWeek === day
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      "py-1.5 px-2.5 rounded text-xs font-medium transition-colors border",
+                      form.daysOfWeek.includes(day)
+                        ? "bg-blue-600 border-blue-500 text-white"
+                        : "bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-500"
                     )}
                   >
-                    {DAY_LABELS[day].slice(0, 3)}
+                    {DAY_LABELS[day]}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Statut par créneau */}
-            <div className="space-y-3">
-              <Label>Statut par créneau</Label>
-              {TIME_SLOTS.map((ts) => {
-                const slotCfg = form.slots[ts]
-                return (
-                  <div key={ts} className="rounded-md border border-slate-700 p-3 space-y-2">
-                    <div className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
-                      {TIME_SLOT_CONFIG[ts].label}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(Object.keys(STATUS_CONFIG) as SlotStatus[]).map((key) => {
-                        const config = STATUS_CONFIG[key]
-                        const selected = slotCfg.status === key
+            {/* Tableau jour × créneau */}
+            {form.daysOfWeek.length > 0 && (
+              <div className="space-y-2">
+                <Label>Disponibilités par jour</Label>
+                <div className="rounded-md border border-slate-700 overflow-hidden">
+                  {/* Header */}
+                  <div className="flex bg-slate-800/80 text-[10px] text-slate-500 uppercase tracking-wide">
+                    <div className="w-12 flex-shrink-0" />
+                    {TIME_SLOTS.map((ts) => (
+                      <div key={ts} className="flex-1 text-center py-1.5">
+                        {TIME_SLOT_CONFIG[ts].label}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Lignes par jour */}
+                  {form.daysOfWeek.map((day) => (
+                    <div key={day} className="flex border-t border-slate-700/50">
+                      <div className="w-12 flex-shrink-0 flex items-center pl-3 text-xs text-slate-400 font-medium">
+                        {DAY_LABELS[day]}
+                      </div>
+                      {TIME_SLOTS.map((ts) => {
+                        const daySlots = form.slots[day] ?? defaultDaySlots()
+                        const slotCfg = daySlots[ts] ?? defaultSlotConfig()
                         return (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => setSlotStatus(ts, key)}
-                            className={cn(
-                              "flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors border",
-                              selected
-                                ? "border-white/50 bg-white/10 text-white"
-                                : "border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200"
+                          <div key={ts} className="flex-1 p-2 border-l border-slate-700/50 space-y-1.5">
+                            <div className="flex flex-wrap gap-1">
+                              {(Object.keys(STATUS_CONFIG) as SlotStatus[]).map((key) => {
+                                const config = STATUS_CONFIG[key]
+                                const selected = slotCfg?.status === key
+                                return (
+                                  <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => setSlotStatus(day, ts, key)}
+                                    className={cn(
+                                      "flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors border",
+                                      selected
+                                        ? "border-white/50 bg-white/10 text-white"
+                                        : "border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200"
+                                    )}
+                                  >
+                                    <span
+                                      className={cn(
+                                        "w-2.5 h-2.5 rounded-full flex-shrink-0",
+                                        key !== "CUSTOM" && config.bgClass,
+                                        key === "CUSTOM" && "bg-violet-500"
+                                      )}
+                                    />
+                                    {config.label}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            {slotCfg?.status === "CUSTOM" && (
+                              <Input
+                                placeholder="Libellé..."
+                                value={slotCfg.customLabel}
+                                onChange={(e) => setSlotLabel(day, ts, e.target.value)}
+                                maxLength={20}
+                                className="h-6 text-xs py-0.5"
+                              />
                             )}
-                          >
-                            <span
-                              className={cn(
-                                "w-3 h-3 rounded-full",
-                                key !== "CUSTOM" && config.bgClass,
-                                key === "CUSTOM" && "bg-violet-500"
-                              )}
-                            />
-                            {config.label}
-                          </button>
+                          </div>
                         )
                       })}
                     </div>
-                    {slotCfg.status === "CUSTOM" && (
-                      <Input
-                        placeholder="Libellé (ex: Sport, Cours...)"
-                        value={slotCfg.customLabel}
-                        onChange={(e) => setSlotLabel(ts, e.target.value)}
-                        maxLength={20}
-                        className="h-8 text-xs mt-1"
-                      />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Dates */}
             <div className="space-y-3">
@@ -364,6 +573,113 @@ export function RecurringRulesManager({ userId, initialRules }: RecurringRulesMa
                   />
                 )}
               </div>
+            </div>
+
+            {/* Rythme */}
+            <div className="space-y-3">
+              <Label>Rythme de répétition</Label>
+              <div className="flex gap-1.5 flex-wrap">
+                {[
+                  { value: 1, label: "Chaque semaine" },
+                  { value: 2, label: "1 sem. / 2" },
+                  { value: 3, label: "1 sem. / 3" },
+                  { value: 4, label: "1 sem. / 4" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, rhythm: opt.value }))}
+                    className={cn(
+                      "px-3 py-1.5 rounded text-xs font-medium transition-colors border",
+                      form.rhythm === opt.value
+                        ? "bg-blue-600 border-blue-500 text-white"
+                        : "bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-500"
+                    )}
+                  >
+                    {opt.value === 1 ? "Chaque semaine" : `1 sem. / ${opt.value}`}
+                  </button>
+                ))}
+              </div>
+              {form.rhythm > 1 && (
+                <div className="space-y-2 mt-2 p-3 rounded-md border border-slate-700 bg-slate-800/50">
+                  <Label htmlFor="rule-rhythmWeekStart" className="text-xs text-slate-400">
+                    Date de référence (première semaine active)
+                  </Label>
+                  <Input
+                    id="rule-rhythmWeekStart"
+                    type="date"
+                    value={form.rhythmWeekStart}
+                    onChange={(e) => setForm((f) => ({ ...f, rhythmWeekStart: e.target.value }))}
+                    className="h-9"
+                  />
+                  <p className="text-xs text-slate-500">
+                    La règle sera active les semaines 1, 3, 5... à partir de cette date.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Priorité */}
+            <div className="space-y-2">
+              <Label htmlFor="rule-priority">Priorité</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="rule-priority"
+                  type="number"
+                  min={0}
+                  max={10}
+                  value={form.priority}
+                  onChange={(e) => setForm((f) => ({ ...f, priority: Math.max(0, parseInt(e.target.value) || 0) }))}
+                  className="w-20 h-9 text-center"
+                />
+                <span className="text-xs text-slate-500">
+                  Priorité haute = écrase les règles de priorité inférieure en cas de conflit
+                </span>
+              </div>
+            </div>
+
+            {/* Rythme */}
+            <div className="space-y-3">
+              <Label>Rythme de répétition</Label>
+              <div className="flex gap-1.5 flex-wrap">
+                {[
+                  { value: 1, label: "Chaque semaine" },
+                  { value: 2, label: "1 sem. / 2" },
+                  { value: 3, label: "1 sem. / 3" },
+                  { value: 4, label: "1 sem. / 4" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, rhythm: opt.value }))}
+                    className={cn(
+                      "px-3 py-1.5 rounded text-xs font-medium transition-colors border",
+                      form.rhythm === opt.value
+                        ? "bg-blue-600 border-blue-500 text-white"
+                        : "bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-500"
+                    )}
+                  >
+                    {opt.value === 1 ? "Chaque semaine" : `1 sem. / ${opt.value}`}
+                  </button>
+                ))}
+              </div>
+              {form.rhythm > 1 && (
+                <div className="space-y-2 mt-2 p-3 rounded-md border border-slate-700 bg-slate-800/50">
+                  <Label htmlFor="rule-rhythmWeekStart" className="text-xs text-slate-400">
+                    Date de référence (première semaine active)
+                  </Label>
+                  <Input
+                    id="rule-rhythmWeekStart"
+                    type="date"
+                    value={form.rhythmWeekStart}
+                    onChange={(e) => setForm((f) => ({ ...f, rhythmWeekStart: e.target.value }))}
+                    className="h-9"
+                  />
+                  <p className="text-xs text-slate-500">
+                    La règle sera active les semaines 1, 3, 5... à partir de cette date.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
